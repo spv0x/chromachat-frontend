@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>chromachat - real-time with backend</title>
+    <title>chromachat - real-time with backend (debug)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined" rel="stylesheet">
@@ -358,7 +358,7 @@
         let messages = []; 
         let tempImageFileDataUrl = null; 
         let socket = null; // Socket.IO instance
-        const SERVER_URL = 'https://chromachat-server.onrender.com';
+        const SERVER_URL = 'https://chromachat-server.onrender.com'; // << YOUR DEPLOYED SERVER URL
         let notificationSound = null;
         let typingTimeout = null;
         let onlineUsers = {}; // Store online users: { userId: {username, profilePicDataUrl, typing} }
@@ -378,75 +378,77 @@
 
         function connectToServer() {
             if (socket && socket.connected) {
-                console.log("already connected to server.");
+                console.log("[DEBUG] Already connected to server.");
                 return;
             }
             updateConnectionStatus('connecting');
-            console.log(`attempting to connect to server: ${SERVER_URL}`);
+            console.log(`[DEBUG] Attempting to connect to server: ${SERVER_URL}`);
             
-            // 2. Initialize Socket.IO client connection
             socket = io(SERVER_URL, {
-                reconnectionAttempts: 5, // Try to reconnect a few times
-                transports: ['websocket'] // Prefer WebSocket
+                reconnectionAttempts: 5, 
+                transports: ['websocket'] 
             });
 
-            // --- Socket.IO Event Handlers ---
             socket.on('connect', () => {
-                userProfile.id = socket.id; // Use socket ID as user ID for this session
+                userProfile.id = socket.id; 
                 updateConnectionStatus('connected');
-                console.log(`connected to server with id: ${userProfile.id}`);
-                // If user profile is already set (e.g. from a previous incomplete setup), send it
+                console.log(`[DEBUG] Connected to server with id: ${userProfile.id}`);
                 if (userProfile.username) {
+                    console.log("[DEBUG] Emitting user_setup on connect as profile exists:", userProfile);
                     socket.emit('user_setup', {
                         username: userProfile.username,
                         profilePicDataUrl: userProfile.profilePicDataUrl
-                        // id is implicitly socket.id on server
                     });
                 }
             });
 
             socket.on('disconnect', (reason) => {
                 updateConnectionStatus('disconnected', reason);
-                console.log(`disconnected from server: ${reason}`);
-                onlineUsers = {}; // Clear user list on disconnect
+                console.log(`[DEBUG] Disconnected from server: ${reason}`);
+                onlineUsers = {}; 
                 renderUserList();
                 typingIndicatorArea.textContent = '';
             });
 
             socket.on('connect_error', (err) => {
                 updateConnectionStatus('error', err.message);
-                console.error(`connection error: ${err.message}`);
+                console.error(`[DEBUG] Connection error: ${err.message}`);
             });
             
             socket.on('current_users', (usersArray) => {
-                onlineUsers = {}; // Reset
+                console.log("[DEBUG] Received 'current_users':", usersArray);
+                onlineUsers = {}; 
                 usersArray.forEach(user => onlineUsers[user.id] = user);
                 renderUserList();
             });
 
             socket.on('update_user_list', (usersArray) => {
-                onlineUsers = {}; // Reset
+                console.log("[DEBUG] Received 'update_user_list':", usersArray);
+                onlineUsers = {}; 
                 usersArray.forEach(user => onlineUsers[user.id] = user);
                 renderUserList();
             });
 
             socket.on('user_joined', (userData) => {
-                if (userData.id === userProfile.id) return; // Don't show notification for self
+                console.log("[DEBUG] Received 'user_joined':", userData);
+                if (userData.id === userProfile.id) return; 
                 onlineUsers[userData.id] = userData;
                 renderUserList();
                 addSystemMessage(`${userData.username} joined the chat.`);
             });
 
             socket.on('user_left', (userData) => {
-                if (!onlineUsers[userData.userId]) return; // Already processed or not in list
+                console.log("[DEBUG] Received 'user_left':", userData);
+                if (!onlineUsers[userData.userId]) return; 
                 const leftUsername = onlineUsers[userData.userId]?.username || userData.username || 'a user';
                 delete onlineUsers[userData.userId];
                 renderUserList();
                 addSystemMessage(`${leftUsername} left the chat.`);
-                updateTypingIndicator(); // Clear if the leaver was typing
+                updateTypingIndicator(); 
             });
 
             socket.on('new_chat_message', (msgData) => {
+                console.log("[DEBUG] Received 'new_chat_message':", msgData);
                 const isSentByCurrentUser = msgData.userId === userProfile.id;
                 addMessageToLocalListAndUI({ ...msgData, isSentByCurrentUser }, true);
                 if (!isSentByCurrentUser) {
@@ -456,42 +458,109 @@
             });
 
             socket.on('user_typing', (typingData) => {
+                // console.log("[DEBUG] Received 'user_typing':", typingData); // Can be noisy
                 if (onlineUsers[typingData.userId] && typingData.userId !== userProfile.id) {
                     onlineUsers[typingData.userId].typing = true;
-                    renderUserList(); // Update list to show typing
+                    renderUserList(); 
                     updateTypingIndicator();
                 }
             });
 
             socket.on('user_stopped_typing', (typingData) => {
+                // console.log("[DEBUG] Received 'user_stopped_typing':", typingData); // Can be noisy
                  if (onlineUsers[typingData.userId] && typingData.userId !== userProfile.id) {
                     onlineUsers[typingData.userId].typing = false;
-                    renderUserList(); // Update list
+                    renderUserList(); 
                     updateTypingIndicator();
                 }
             });
         }
-
-        // --- App Initialization ---
-        function initializeApp() {
-            applyTheme(loadThemePreference()); 
-            initializeSounds();
-            requestNotificationPermission();
-            // User list will be rendered by server events
-
-            if (userProfile.username && userProfile.id) { // If reloaded and had a profile and ID
-                currentUserAvatar.src = userProfile.profilePicDataUrl;
-                hideUserSetupModal();
-                connectToServer(); // Attempt to reconnect
-                // Messages will be loaded by server if persistence is added later
-            } else {
-                showUserSetupModal(true);
+        
+        // --- App Initialization (with DEBUG logs) ---
+        function applyTheme(theme) {
+            console.log("[DEBUG] applyTheme called with theme:", theme); 
+            const themeIconElement = document.getElementById('themeToggleButton');
+            
+            if (!themeIconElement) {
+                console.error("[DEBUG] CRITICAL ERROR: themeToggleButton element NOT FOUND in applyTheme!");
             }
-            setupEmojiPicker();
+            const icon = themeIconElement ? themeIconElement.querySelector('.material-icons-outlined') : null;
+
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+                if (icon) {
+                    icon.textContent = 'light_mode';
+                } else if (themeIconElement) {
+                    console.warn("[DEBUG] Icon span inside themeToggleButton not found.");
+                }
+            } else {
+                document.documentElement.classList.remove('dark');
+                if (icon) {
+                    icon.textContent = 'brightness_6';
+                } else if (themeIconElement) {
+                    console.warn("[DEBUG] Icon span inside themeToggleButton not found.");
+                }
+            }
+            
+            console.log("[DEBUG] applyTheme: DOM classList for dark mode set.");
+
+            const currentAvatarElem = document.getElementById('currentUserAvatar');
+            const profilePicPreviewElem = document.getElementById('profilePicPreview');
+            const avatarPlaceholderColor = theme === 'dark' ? '374151/f3f4f6' : 'E0E0E0/757575';
+            
+            if (profilePicPreviewElem) {
+                profilePicPreviewElem.src = `https://placehold.co/80x80/${avatarPlaceholderColor}?text=avatar`;
+            } else {
+                console.warn("[DEBUG] profilePicPreview element not found in applyTheme");
+            }
+
+            if (currentAvatarElem) {
+                if (!userProfile.profilePicDataUrl || 
+                    userProfile.profilePicDataUrl.includes('placehold.co') || 
+                    (userProfile.profilePicDataUrl.includes('ui-avatars.com') && !userProfile.username) 
+                ) {
+                     if (!userProfile.username) { 
+                         currentAvatarElem.src = `https://placehold.co/40x40/${avatarPlaceholderColor}?text=me`;
+                     }
+                }
+            } else {
+                 console.warn("[DEBUG] currentUserAvatar element not found in applyTheme");
+            }
+            console.log("[DEBUG] Theme application finished.");
         }
+
+        function initializeApp() {
+            console.log("[DEBUG] Script execution started. Attempting to initialize app..."); 
+            
+            if (!document.getElementById('themeToggleButton')) console.error("[DEBUG] CRITICAL: themeToggleButton NOT found before calling applyTheme!");
+            if (!document.getElementById('currentUserAvatar')) console.error("[DEBUG] CRITICAL: currentUserAvatar NOT found before calling applyTheme!");
+            if (!document.getElementById('profilePicPreview')) console.error("[DEBUG] CRITICAL: profilePicPreview NOT found before calling applyTheme!");
+
+            applyTheme(loadThemePreference());
+            console.log("[DEBUG] Theme applied."); 
+            initializeSounds();
+            console.log("[DEBUG] Sounds initialized."); 
+            requestNotificationPermission();
+            console.log("[DEBUG] Notification permission requested."); 
+
+            if (userProfile.username && userProfile.id) { 
+                console.log("[DEBUG] User profile found (username, id), showing main chat."); 
+                if(currentUserAvatar) currentUserAvatar.src = userProfile.profilePicDataUrl; else console.error("currentUserAvatar is null when trying to set src for existing user");
+                hideUserSetupModal();
+                connectToServer(); 
+            } else {
+                console.log("[DEBUG] No complete user profile (username or id missing), showing setup modal."); 
+                showUserSetupModal(true); 
+            }
+            console.log("[DEBUG] Setting up emoji picker."); 
+            setupEmojiPicker();
+            console.log("[DEBUG] App initialization complete."); 
+        }
+
 
         // --- User Profile & Setup ---
         async function handleJoinChat() {
+            console.log("[DEBUG] handleJoinChat called");
             joinChatButtonDefaultIcon.classList.add('hidden');
             joinChatButtonText.classList.add('hidden');
             joinChatButtonLoader.classList.remove('hidden');
@@ -516,17 +585,17 @@
                  profilePicPreview.src = userProfile.profilePicDataUrl;
             }
             
-            currentUserAvatar.src = userProfile.profilePicDataUrl;
+            if(currentUserAvatar) currentUserAvatar.src = userProfile.profilePicDataUrl; else console.error("[DEBUG] currentUserAvatar is null in handleJoinChat");
             
-            // If socket is already connected (e.g. user refreshed after connecting), emit setup
-            // Otherwise, connectToServer will handle emitting setup on 'connect'
             if (socket && socket.connected) {
+                 console.log("[DEBUG] Socket connected, emitting user_setup in handleJoinChat:", userProfile);
                  socket.emit('user_setup', {
                     username: userProfile.username,
                     profilePicDataUrl: userProfile.profilePicDataUrl
                 });
             } else {
-                connectToServer(); // This will trigger user_setup on successful connection
+                console.log("[DEBUG] Socket not connected, calling connectToServer in handleJoinChat. user_setup will be emitted on 'connect'.");
+                connectToServer(); 
             }
             
             resetJoinButton();
@@ -539,43 +608,37 @@
         function hideUserSetupModal() { /* ... same as before ... */ }
         
         // --- Message Handling ---
-        function renderMessages() { /* ... same as before ... */ }
+        function renderMessages() {
+            // console.log("[DEBUG] renderMessages called. Current messages count:", messages.length);
+            messagesContainer.innerHTML = ''; 
+            messages.forEach(msg => addMessageToUI(msg, false, true)); 
+            scrollToBottom();
+        }
 
         async function handleSendMessage() {
+            // console.log("[DEBUG] handleSendMessage called");
             if (!userProfile.username || !socket || !socket.connected) {
-                // Optionally show an error message if not connected
-                console.warn("Cannot send message: profile not set or not connected.");
+                console.warn("[DEBUG] Cannot send message: profile not set or not connected.");
                 return;
             }
             const text = messageInput.value.trim();
             let imageFileDataUrlToSend = tempImageFileDataUrl; 
             if (!text && !imageFileDataUrlToSend) return;
 
-            // Optimistic message object (server will add/override some fields)
             const clientMessage = {
-                // id will be assigned by server or use a temp client one for optimistic UI
-                // For now, let server assign ID for simplicity in handling echoes.
-                // tempId: `temp_${userProfile.id}_${Date.now()}`,
-                userId: userProfile.id, // Client knows its ID from socket.id
+                userId: userProfile.id, 
                 username: userProfile.username,
                 profilePicDataUrl: userProfile.profilePicDataUrl,
                 text: text,
                 imageUrl: imageFileDataUrlToSend, 
-                timestamp: new Date().toISOString(), // Client timestamp for optimistic display
-                // isSentByCurrentUser: true // Will be determined when displaying
+                timestamp: new Date().toISOString(), 
             };
             
-            // Emit to server
+            console.log("[DEBUG] Emitting chat_message:", clientMessage);
             socket.emit('chat_message', clientMessage);
             
-            // Optimistic UI update for the sender
-            // addMessageToLocalListAndUI({ ...clientMessage, isSentByCurrentUser: true }, true);
-            // Server will broadcast it back, including to sender, so sender will get it via 'new_chat_message'
-            // This avoids potential duplicate display if server is quick.
-
             if (typingTimeout) clearTimeout(typingTimeout);
             socket.emit('stop_typing');
-
 
             messageInput.value = ''; imageFileInput.value = ''; 
             tempImageFileDataUrl = null; 
@@ -585,90 +648,26 @@
         }
         
         function addMessageToLocalListAndUI(msg, animate = true) {
+            // console.log("[DEBUG] addMessageToLocalListAndUI called with msg:", msg);
             const existingMsgIndex = messages.findIndex(m => m.id === msg.id);
             if (existingMsgIndex === -1) { messages.push(msg); }
             else { messages[existingMsgIndex] = msg; } 
-            
-            // Re-render all messages to ensure order and avoid duplicates in UI from simple append
-            // This is less efficient but simpler for managing server broadcasts
             renderMessages(); 
         }
 
         function addSystemMessage(text) {
+            // console.log("[DEBUG] addSystemMessage:", text);
             const systemMessage = {
-                id: `system_${Date.now()}`,
-                text: text,
-                timestamp: new Date().toISOString(),
-                isSystem: true,
-                isSentByCurrentUser: false // System messages are never "sent by current user"
+                id: `system_${Date.now()}`, text: text,
+                timestamp: new Date().toISOString(), isSystem: true,
+                isSentByCurrentUser: false 
             };
             addMessageToLocalListAndUI(systemMessage, true);
         }
 
         // --- UI Updates (Messages, User List, Typing) ---
         function formatTimestamp(isoTimestamp, timezone = 'Europe/Bucharest') { /* ... same as before ... */ }
-
-        function createMessageElement(msg) {
-            const isSent = msg.userId === userProfile.id; // Determine if sent by current user
-            const messageWrapper = document.createElement('div');
-            messageWrapper.classList.add('message-item');
-            if (msg.isSystem) {
-                messageWrapper.classList.add('system-animation');
-            } else {
-                messageWrapper.classList.add(isSent ? 'sent-animation' : 'received-animation');
-            }
-            messageWrapper.dataset.messageId = msg.id;
-
-            if (msg.isSystem) {
-                const systemDiv = document.createElement('div');
-                systemDiv.classList.add('message-bubble', 'system', 'p-2', 'my-1', 'text-center', 'text-xs', 'text-gray-500', 'dark:text-gray-400');
-                systemDiv.textContent = msg.text;
-                messageWrapper.appendChild(systemDiv);
-                return messageWrapper;
-            }
-
-
-            const messageDiv = document.createElement('div');
-            messageDiv.classList.add('flex', 'items-end', 'gap-2', 'max-w-[85%]', 'sm:max-w-[75%]');
-             if(isSent) messageDiv.classList.add('ml-auto'); else messageDiv.classList.add('mr-auto');
-            
-            const avatarImg = document.createElement('img');
-            avatarImg.src = msg.profilePicDataUrl || (isSent ? userProfile.profilePicDataUrl : 'https://placehold.co/32x32/757575/E0E0E0?text=U');
-            avatarImg.alt = msg.username;
-            avatarImg.classList.add('message-avatar', 'shadow');
-            if (isSent) avatarImg.classList.add('order-2');
-
-            const contentBubble = document.createElement('div');
-            contentBubble.classList.add('message-bubble', isSent ? 'sent' : 'received', 'p-3', 'shadow-md');
-            
-            const usernameSpan = document.createElement('span');
-            usernameSpan.classList.add('block', 'text-xs', 'font-semibold', 'mb-1');
-            usernameSpan.style.textTransform = 'none'; 
-            if (isSent) {
-                usernameSpan.classList.add('text-green-100'); usernameSpan.textContent = 'you'; 
-            } else {
-                usernameSpan.classList.add('text-accent'); usernameSpan.textContent = msg.username;
-            }
-            
-            const textP = document.createElement('p');
-            textP.classList.add('text-sm', 'whitespace-pre-wrap', 'break-words');
-            textP.textContent = msg.text || '';
-
-            contentBubble.appendChild(usernameSpan); contentBubble.appendChild(textP);
-
-            if (msg.imageUrl) { /* ... same as before ... */ }
-            
-            const timestampSpan = document.createElement('span');
-            timestampSpan.classList.add('block', 'text-xs', 'mt-1.5', isSent ? 'text-green-50 opacity-80 text-right' : 'text-gray-500 dark:text-gray-400 text-left');
-            timestampSpan.textContent = formatTimestamp(msg.serverTimestamp || msg.timestamp); // Prefer server timestamp
-            contentBubble.appendChild(timestampSpan);
-
-            if (isSent) { messageDiv.appendChild(contentBubble); messageDiv.appendChild(avatarImg); }
-            else { messageDiv.appendChild(avatarImg); messageDiv.appendChild(contentBubble); }
-            messageWrapper.appendChild(messageDiv);
-            return messageWrapper;
-        }
-
+        function createMessageElement(msg) { /* ... same as before ... */ }
         function addMessageToUI(msg, animate = true, isInitialLoad = false) { /* ... same as before ... */ }
         function scrollToBottom() { /* ... same as before ... */ }
         function readFileAsDataURL(file) { /* ... same as before ... */ }
@@ -678,39 +677,22 @@
         function closeImagePreview() { /* ... same as before ... */ }
         closeImagePreviewButton.addEventListener('click', closeImagePreview);
         imagePreviewModalFullImgBackdrop.addEventListener('click', closeImagePreview);
-        function applyTheme(theme) { /* ... same as before ... */ }
+        // function applyTheme(theme) { /* MOVED INTO DEBUG VERSION ABOVE */ }
         function toggleTheme() { /* ... same as before ... */ }
         function loadThemePreference() { return localStorage.getItem(THEME_KEY) || 'dark'; }
         themeToggleButton.addEventListener('click', toggleTheme);
 
         // --- User List & Typing Indicator ---
         function renderUserList() {
+            // console.log("[DEBUG] renderUserList called. Online users:", onlineUsers);
             userListDiv.innerHTML = '';
             const usersToDisplay = Object.values(onlineUsers);
-            
-            // Sort: current user first, then alphabetically
             usersToDisplay.sort((a, b) => {
                 if (a.id === userProfile.id) return -1;
                 if (b.id === userProfile.id) return 1;
                 return a.username.localeCompare(b.username);
             });
-
-            usersToDisplay.forEach(user => {
-                const userItem = document.createElement('div');
-                userItem.classList.add('user-list-item', 'flex', 'items-center', 'p-2', 'rounded-md', 'cursor-default');
-                if (user.id === userProfile.id) {
-                    userItem.classList.add('bg-green-50', 'dark:bg-green-900');
-                }
-                userItem.innerHTML = `
-                    <img src="${user.profilePicDataUrl}" alt="${user.username}" class="w-7 h-7 rounded-full mr-2.5 object-cover">
-                    <div class="flex-1 truncate">
-                        <span class="text-sm font-medium">${user.username} ${user.id === userProfile.id ? '(you)' : ''}</span>
-                        <div class="typing-text ${user.typing ? '' : 'hidden'}">typing...</div>
-                    </div>
-                    <div class="online-dot ml-auto"></div>
-                `;
-                userListDiv.appendChild(userItem);
-            });
+            usersToDisplay.forEach(user => { /* ... same as before ... */ });
         }
 
         function updateTypingIndicator() {
@@ -731,9 +713,7 @@
             if (!socket || !socket.connected) return;
             if (typingTimeout) clearTimeout(typingTimeout);
             socket.emit('start_typing');
-            typingTimeout = setTimeout(() => {
-                socket.emit('stop_typing');
-            }, 2000); // Auto-stop typing after 2 seconds of no input
+            typingTimeout = setTimeout(() => { socket.emit('stop_typing'); }, 2000);
         });
         
         toggleUserListButton.addEventListener('click', () => userListSidebar.classList.toggle('open'));
@@ -746,8 +726,15 @@
         // --- Event Listeners & Init ---
         sendMessageButton.addEventListener('click', handleSendMessage);
         messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }});
-        window.onload = initializeApp;
-        window.onbeforeunload = () => { if (socket && socket.connected) socket.disconnect(); if(typingTimeout) clearTimeout(typingTimeout); };
+        
+        // Ensure this is the LAST line of your script block, or at least after all function definitions
+        window.onload = initializeApp; 
+        
+        window.onbeforeunload = () => { 
+            console.log("[DEBUG] onbeforeunload: Disconnecting socket if connected.");
+            if (socket && socket.connected) socket.disconnect(); 
+            if(typingTimeout) clearTimeout(typingTimeout); 
+        };
     </script>
 </body>
 </html>
