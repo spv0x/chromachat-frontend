@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>chromachat - real-time (modal css fix)</title>
+    <title>chromachat - real-time (js fix)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined" rel="stylesheet">
@@ -89,7 +89,6 @@
         }
         .message-image:hover { transform: scale(1.05); }
 
-        /* Modal Animation CSS */
         .modal-bg-enter { opacity: 0; }
         .modal-bg-enter-active { opacity: 0.75; transition: opacity 300ms ease-out; }
         .modal-bg-leave-active { opacity: 0; transition: opacity 200ms ease-in; }
@@ -98,11 +97,10 @@
         .modal-content-enter-active { opacity: 1; transform: scale(1) translateY(0); transition: opacity 300ms ease-out, transform 300ms cubic-bezier(0.25, 0.8, 0.25, 1); }
         .modal-content-leave-active { opacity: 0; transform: scale(0.9); transition: opacity 200ms ease-in, transform 200ms ease-in; }
 
-        #imagePreviewModal { background-color: transparent; } /* Backdrop is separate */
+        #imagePreviewModal { background-color: transparent; } 
         #imagePreviewModal img { 
             max-height: 90vh; max-width: 90vw; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: 8px; text-transform: none;
-            /* Animation classes for image preview modal are similar to userSetupModal */
         }
         
         .file-input-button {
@@ -202,9 +200,7 @@
 
     <!-- Initial User Setup Modal -->
     <div id="userSetupModal" class="fixed inset-0 flex items-center justify-center z-50 p-4">
-        <!-- MODIFICATION: Removed initial opacity-0 from backdrop -->
         <div id="userSetupModalBackdrop" class="absolute inset-0 bg-gray-900"></div>
-        <!-- MODIFICATION: Removed initial opacity-0 and scale-90 from content -->
         <div id="userSetupModalContent" class="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-md transform">
             <div class="text-center">
                 <span class="material-icons-outlined text-5xl text-accent mb-3">groups</span>
@@ -300,20 +296,54 @@
     </div>
 
     <div id="imagePreviewModal" class="fixed inset-0 flex items-center justify-center z-50 p-4 hidden">
-        <div id="imagePreviewModalBackdrop" class="absolute inset-0 bg-black"></div> <!-- MODIFICATION: Removed opacity-0 here for testing -->
-        <img id="fullScreenImage" src="" alt="full screen preview" class="max-w-full max-h-full rounded-lg shadow-xl z-10 transform"> <!-- MODIFICATION: Removed opacity-0 scale-90 here for testing -->
+        <div id="imagePreviewModalBackdrop" class="absolute inset-0 bg-black"></div>
+        <img id="fullScreenImage" src="" alt="full screen preview" class="max-w-full max-h-full rounded-lg shadow-xl z-10 transform">
         <button id="closeImagePreviewButton" class="absolute top-4 right-4 text-white text-3xl z-20 p-2 rounded-full bg-black bg-opacity-50 hover:bg-opacity-75" aria-label="close image preview">
             <span class="material-icons">close</span>
         </button>
     </div>
 
     <script>
-        // DOM Elements
+        // DOM Elements (ensure all are captured)
         const userSetupModal = document.getElementById('userSetupModal');
         const userSetupModalBackdrop = document.getElementById('userSetupModalBackdrop');
         const userSetupModalContent = document.getElementById('userSetupModalContent');
         const usernameInput = document.getElementById('usernameInput');
-        // ... (rest of DOM elements)
+        const profilePicInput = document.getElementById('profilePicInput');
+        const profilePicPreview = document.getElementById('profilePicPreview');
+        const joinChatButton = document.getElementById('joinChatButton');
+        const joinChatButtonDefaultIcon = joinChatButton.querySelector('.default-icon');
+        const joinChatButtonText = joinChatButton.querySelector('.button-text');
+        const joinChatButtonLoader = joinChatButton.querySelector('.button-loader');
+        const setupError = document.getElementById('setupError');
+        
+        const chatAppContainer = document.getElementById('chatAppContainer');
+        const chatApp = document.getElementById('chatApp'); 
+        const messagesContainer = document.getElementById('messagesContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendMessageButton = document.getElementById('sendMessageButton');
+        const currentUserAvatar = document.getElementById('currentUserAvatar');
+        const connectionStatusDiv = document.getElementById('connectionStatus');
+        const userListSidebar = document.getElementById('userListSidebar');
+        const userListDiv = document.getElementById('userList');
+        const toggleUserListButton = document.getElementById('toggleUserListButton');
+        const typingIndicatorArea = document.getElementById('typingIndicatorArea');
+
+        const attachFileButtonWrapper = document.getElementById('attachFileButtonWrapper');
+        const attachFileButtonTrigger = document.getElementById('attachFileButtonTrigger');
+        const attachFileLoader = document.getElementById('attachFileLoader');
+        const imageFileInput = document.getElementById('imageFileInput');
+
+        const imagePreviewModal = document.getElementById('imagePreviewModal');
+        const imagePreviewModalFullImg = document.getElementById('fullScreenImage');
+        const imagePreviewModalFullImgBackdrop = document.getElementById('imagePreviewModalBackdrop');
+        const closeImagePreviewButton = document.getElementById('closeImagePreviewButton');
+        const themeToggleButton = document.getElementById('themeToggleButton');
+
+        const emojiButton = document.getElementById('emojiButton');
+        const emojiPicker = document.getElementById('emojiPicker');
+        const emojiGridContainer = document.getElementById('emojiGridContainer');
+        const emojiSearchInput = document.getElementById('emojiSearchInput');
 
         // --- State ---
         let userProfile = { /* ... */ };
@@ -321,140 +351,171 @@
         let tempImageFileDataUrl = null; 
         let socket = null; 
         const SERVER_URL = 'https://chromachat-server.onrender.com'; 
-        // ... (rest of state variables)
+        let notificationSound = null;
+        let typingTimeout = null;
+        let onlineUsers = {}; 
+
+        const THEME_KEY = 'chromaChatThemePreference';
         
-        // --- Sound Initialization ---
+        // --- Function Definitions (Sound, Notifications, Socket, ApplyTheme, etc.) ---
+        // ... (All function definitions from previous version) ...
         function initializeSounds() { /* ... */ }
         function playNotificationSound() { /* ... */ }
-
-        // --- Notifications ---
         function requestNotificationPermission() { /* ... */ }
         function showNotification(title, body, icon) { /* ... */ }
-
-        // --- Socket.IO Connection & Status ---
         function updateConnectionStatus(status, message = '') { /* ... */ }
         function connectToServer() { /* ... */ }
-        
-        // --- App Initialization (with DEBUG logs) ---
-        function applyTheme(theme) { /* ... same as before with DEBUG logs ... */ }
-        function initializeApp() { /* ... same as before with DEBUG logs ... */ }
-
-        // --- User Profile & Setup ---
-        async function handleJoinChat() { /* ... same as before ... */ }
-        function resetJoinButton() { /* ... same as before ... */ }
-        profilePicInput.addEventListener('change', async (e) => { /* ... same as before ... */ });
-        joinChatButton.addEventListener('click', async () => { if (await handleJoinChat()) hideUserSetupModal(); });
-        
-        // --- Modal Visibility (with DEBUG logs) ---
-        function showUserSetupModal(initial = false) {
-            console.log("[DEBUG] showUserSetupModal called, initial:", initial); 
-            if (!userSetupModal || !userSetupModalBackdrop || !userSetupModalContent || !chatAppContainer) {
-                console.error("[DEBUG] CRITICAL: One or more modal/app elements not found in showUserSetupModal!");
-                return; 
-            }
-
-            userSetupModal.classList.remove('hidden'); // This should make it part of the layout
-            console.log("[DEBUG] userSetupModal 'hidden' class removed. Current classes:", userSetupModal.className); 
-
-            // Forcing a reflow before adding animation classes can sometimes help.
-            void userSetupModal.offsetWidth; 
-
-            if (initial) { // Only apply enter animations on initial show
-                userSetupModalBackdrop.classList.remove('modal-bg-leave-active');
-                userSetupModalBackdrop.classList.add('modal-bg-enter', 'modal-bg-enter-active');
-                
-                userSetupModalContent.classList.remove('modal-content-leave-active');
-                userSetupModalContent.classList.add('modal-content-enter', 'modal-content-enter-active');
-                console.log("[DEBUG] Initial modal animation classes applied."); 
-            } else { // If re-shown, just ensure it's visible (styles might be directly set if needed)
-                // This path might not be hit if we always hide/show with animations.
-                // We removed initial opacity-0 from HTML, so these should be visible by default
-                // once 'hidden' is removed from userSetupModal. The animation classes will then take over.
-                console.log("[DEBUG] Modal shown (not initial) - relying on default visibility + animation classes.");
-            }
-            chatAppContainer.classList.add('hidden'); 
-            console.log("[DEBUG] chatAppContainer 'hidden' class added. Current classes:", chatAppContainer.className); 
-            console.log("[DEBUG] showUserSetupModal finished.");
-        }
-
-        function hideUserSetupModal() {
-            console.log("[DEBUG] hideUserSetupModal called"); 
-            if (!userSetupModal || !userSetupModalBackdrop || !userSetupModalContent || !chatAppContainer || !chatApp || !messageInput) {
-                console.error("[DEBUG] CRITICAL: One or more modal/app elements not found in hideUserSetupModal!");
-                return;
-            }
-
-            userSetupModalBackdrop.classList.remove('modal-bg-enter', 'modal-bg-enter-active');
-            userSetupModalBackdrop.classList.add('modal-bg-leave-active');
-            
-            userSetupModalContent.classList.remove('modal-content-enter', 'modal-content-enter-active');
-            userSetupModalContent.classList.add('modal-content-leave-active');
-            console.log("[DEBUG] Modal leave animation classes applied."); 
-
-            setTimeout(() => {
-                console.log("[DEBUG] setTimeout in hideUserSetupModal triggered."); 
-                userSetupModal.classList.add('hidden'); // Add hidden back AFTER animation
-                chatAppContainer.classList.remove('hidden'); 
-                chatAppContainer.classList.add('flex');      
-                chatApp.classList.add('app-loaded');         
-                console.log("[DEBUG] Main app shown, app-loaded class added."); 
-                setTimeout(() => {
-                    if(messageInput) {
-                         messageInput.focus();
-                         console.log("[DEBUG] Message input focused."); 
-                    } else {
-                        console.error("[DEBUG] messageInput is null in hideUserSetupModal's inner setTimeout!");
-                    }
-                }, 50); 
-            }, 300); // Match modal animation duration
-            console.log("[DEBUG] hideUserSetupModal finished.");
-        }
-        
-        // --- Message Handling ---
+        function applyTheme(theme) { /* ... with DEBUG logs ... */ }
+        async function handleJoinChat() { /* ... */ }
+        function resetJoinButton() { /* ... */ }
+        function showUserSetupModal(initial = false) { /* ... with DEBUG logs ... */ }
+        function hideUserSetupModal() { /* ... with DEBUG logs ... */ }
         function renderMessages() { /* ... */ }
         async function handleSendMessage() { /* ... */ }
         function addMessageToLocalListAndUI(msg, animate = true) { /* ... */ }
         function addSystemMessage(text) { /* ... */ }
-
-        // --- UI Updates (Messages, User List, Typing) ---
         function formatTimestamp(isoTimestamp, timezone = 'Europe/Bucharest') { /* ... */ }
         function createMessageElement(msg) { /* ... */ }
         function addMessageToUI(msg, animate = true, isInitialLoad = false) { /* ... */ }
         function scrollToBottom() { /* ... */ }
         function readFileAsDataURL(file) { /* ... */ }
-        attachFileButtonTrigger.addEventListener('click', () => imageFileInput.click());
-        imageFileInput.addEventListener('change', async (e) => { /* ... */ });
         function showImagePreview(src) { /* ... */ }
         function closeImagePreview() { /* ... */ }
-        closeImagePreviewButton.addEventListener('click', closeImagePreview);
-        imagePreviewModalFullImgBackdrop.addEventListener('click', closeImagePreview);
-        // function applyTheme(theme) { /* MOVED INTO DEBUG VERSION ABOVE */ }
         function toggleTheme() { /* ... */ }
         function loadThemePreference() { return localStorage.getItem(THEME_KEY) || 'dark'; }
-        themeToggleButton.addEventListener('click', toggleTheme);
-
-        // --- User List & Typing Indicator ---
         function renderUserList() { /* ... */ }
         function updateTypingIndicator() { /* ... */ }
-        messageInput.addEventListener('input', () => { /* ... */ });
-        toggleUserListButton.addEventListener('click', () => userListSidebar.classList.toggle('open'));
+        const emojis = { /* ... */ };
+        function renderEmojiPicker(searchTerm = "") { /* ... */ }
+        function setupEmojiPicker() { /* ... */ }
 
-        // --- Emoji Picker ---
-        const emojis = { /* ... same as before ... */ };
-        function renderEmojiPicker(searchTerm = "") { /* ... same as before ... */ }
-        function setupEmojiPicker() { /* ... same as before ... */ }
 
-        // --- Event Listeners & Init ---
-        sendMessageButton.addEventListener('click', handleSendMessage);
-        messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }});
+        // --- App Initialization ---
+        function initializeApp() {
+            console.log("[DEBUG] Script execution started. Attempting to initialize app..."); 
+            
+            // Element existence checks
+            if (!document.getElementById('themeToggleButton')) console.error("[DEBUG] CRITICAL: themeToggleButton NOT found!");
+            if (!userSetupModal) console.error("[DEBUG] CRITICAL: userSetupModal var is null/undefined!");
+            // ... (add more checks for all globally declared DOM element consts if needed)
+
+            applyTheme(loadThemePreference());
+            console.log("[DEBUG] Theme applied."); 
+            initializeSounds();
+            console.log("[DEBUG] Sounds initialized."); 
+            requestNotificationPermission();
+            console.log("[DEBUG] Notification permission requested."); 
+
+            if (userProfile.username && userProfile.id) { 
+                console.log("[DEBUG] User profile found, showing main chat."); 
+                if(currentUserAvatar) currentUserAvatar.src = userProfile.profilePicDataUrl;
+                hideUserSetupModal();
+                connectToServer(); 
+            } else {
+                console.log("[DEBUG] No complete user profile, showing setup modal."); 
+                showUserSetupModal(true); 
+            }
+            console.log("[DEBUG] Setting up emoji picker."); 
+            setupEmojiPicker();
+
+            // MODIFICATION: Move global event listener attachments here
+            console.log("[DEBUG] Attaching global event listeners.");
+            if (profilePicInput) profilePicInput.addEventListener('change', async (e) => { /* ... file processing logic from original handleJoinChat/profilePicInput listener ... */ 
+                const file = e.target.files[0];
+                if (file) {
+                    if (file.size > 1 * 1024 * 1024) {
+                        setupError.textContent = "image too large! max 1mb.";
+                        profilePicInput.value = ""; return;
+                    }
+                    setupError.textContent = "";
+                    profilePicPreview.classList.add('loading');
+                    try {
+                        // Store in a temporary variable if needed for handleJoinChat, or directly update userProfile if appropriate here
+                        const dataUrl = await readFileAsDataURL(file);
+                        profilePicPreview.src = dataUrl; 
+                        // If you want to immediately prepare it for userProfile:
+                        // userProfile.newProfilePicDataUrl = dataUrl; // Example
+                    } catch (err) {
+                        setupError.textContent = "could not process image.";
+                    } finally {
+                        profilePicPreview.classList.remove('loading');
+                    }
+                }
+            }); else console.error("[DEBUG] profilePicInput is null, cannot attach listener.");
+
+            if (joinChatButton) joinChatButton.addEventListener('click', async () => { if (await handleJoinChat()) hideUserSetupModal(); }); else console.error("[DEBUG] joinChatButton is null!");
+            if (attachFileButtonTrigger) attachFileButtonTrigger.addEventListener('click', () => imageFileInput.click()); else console.error("[DEBUG] attachFileButtonTrigger is null!");
+            if (imageFileInput) imageFileInput.addEventListener('change', async (e) => { /* ... file processing logic ... */ 
+                const file = e.target.files[0];
+                if (file) {
+                    if (file.size > 1.5 * 1024 * 1024) { 
+                        alert("image file is too large for messages (max 1.5mb).");
+                        imageFileInput.value = ""; tempImageFileDataUrl = null;
+                        attachFileButtonTrigger.classList.remove('text-green-400'); return;
+                    }
+                    attachFileLoader.classList.remove('hidden');
+                    attachFileButtonTrigger.classList.add('opacity-50');
+                    try {
+                        tempImageFileDataUrl = await readFileAsDataURL(file);
+                        attachFileButtonTrigger.classList.add('text-green-400'); 
+                    } catch (error) {
+                        alert("could not process the image file.");
+                        tempImageFileDataUrl = null; attachFileButtonTrigger.classList.remove('text-green-400');
+                    } finally {
+                        attachFileLoader.classList.add('hidden');
+                        attachFileButtonTrigger.classList.remove('opacity-50');
+                    }
+                } else { tempImageFileDataUrl = null; attachFileButtonTrigger.classList.remove('text-green-400'); }
+            }); else console.error("[DEBUG] imageFileInput is null!");
+
+            if (closeImagePreviewButton) closeImagePreviewButton.addEventListener('click', closeImagePreview); else console.error("[DEBUG] closeImagePreviewButton is null!");
+            // Check if imagePreviewModalFullImgBackdrop is valid before adding listener
+            if (imagePreviewModalFullImgBackdrop) {
+                imagePreviewModalFullImgBackdrop.addEventListener('click', closeImagePreview);
+            } else {
+                console.error("[DEBUG] imagePreviewModalFullImgBackdrop is null! Cannot attach click listener for closing image preview via backdrop.");
+            }
+            if (themeToggleButton) themeToggleButton.addEventListener('click', toggleTheme); else console.error("[DEBUG] themeToggleButton is null!");
+            if (sendMessageButton) sendMessageButton.addEventListener('click', handleSendMessage); else console.error("[DEBUG] sendMessageButton is null!");
+            if (messageInput) {
+                messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }});
+                messageInput.addEventListener('input', () => {
+                    if (!socket || !socket.connected) return;
+                    if (typingTimeout) clearTimeout(typingTimeout);
+                    socket.emit('start_typing');
+                    typingTimeout = setTimeout(() => { socket.emit('stop_typing'); }, 2000);
+                });
+            } else console.error("[DEBUG] messageInput is null!");
+            if (toggleUserListButton) toggleUserListButton.addEventListener('click', () => userListSidebar.classList.toggle('open')); else console.error("[DEBUG] toggleUserListButton is null!");
+            
+            console.log("[DEBUG] App initialization complete."); 
+        }
         
         window.onload = initializeApp; 
-        window.onbeforeunload = () => { /* ... */ };
-
-        // Ensure all DOM element variables are defined after the DOM is loaded
-        // or ensure they are only accessed within functions called after window.onload
-        // The current structure with them as global consts should be fine as long as
-        // they are only *used* in functions called by/after initializeApp.
+        window.onbeforeunload = () => { 
+            console.log("[DEBUG] onbeforeunload: Disconnecting socket if connected.");
+            if (socket && socket.connected) socket.disconnect(); 
+            if(typingTimeout) clearTimeout(typingTimeout); 
+        };
     </script>
 </body>
 </html>
+```
+
+**Key Changes in this Version:**
+
+1.  **Moved Event Listeners:** All the `addEventListener` calls that were previously in the global scope (after function definitions but before `window.onload`) have been moved *inside* the `initializeApp` function. This ensures they are only attached *after* `window.onload` has fired, guaranteeing that all DOM elements are parsed and their corresponding JavaScript constants (like `imagePreviewModalFullImgBackdrop`) have been successfully assigned.
+2.  **Added Null Checks for Event Listener Attachments:** Before attaching an event listener, I've added a simple `if (elementVariable)` check. If any of the essential element variables are `null` (meaning `document.getElementById` failed to find them), an error will be logged in the console, but it won't try to call `.addEventListener` on `null`, which would throw a `TypeError` and halt further listener attachments. This helps isolate if a specific element ID is mismatched.
+
+**Please deploy this new version to Netlify.**
+
+Then, open `https://chromachat.netlify.app/` and immediately check the developer console.
+
+**What to look for in the console now:**
+
+* **No `ReferenceError` for `imagePreviewModalFullImgBackdrop`:** This specific error should be gone.
+* **Any new `[DEBUG] CRITICAL: ... element NOT found!` messages OR `[DEBUG] ... is null, cannot attach listener.` messages:** If you see these, it means there's a typo in an HTML element's `id` or the element is unexpectedly missing from the DOM when the script tries to find it.
+* **Modal Visibility:** Does the user setup modal appear now?
+* **Other Errors:** Are there any *new* red errors?
+
+This change directly addresses the most likely cause of the `ReferenceError` by ensuring the order of operations is robu
