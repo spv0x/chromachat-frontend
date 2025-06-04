@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>chromachat - real-time with backend</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined" rel="stylesheet">
+    <!-- 1. Include Socket.IO Client Library -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script> 
+    <style>
+        :root {
+            --accent-color: #4caf50; --accent-color-dark: #388e3c;
+            --text-primary: #212121; --text-secondary: #757575;
+            --bg-light: #f5f5f5; --bg-default: #ffffff; --divider-color: #e0e0e0;
+        }
+        body {
+            font-family: 'Roboto', 'Noto Color Emoji', sans-serif;
+            background-color: var(--bg-light); color: var(--text-primary);
+            overscroll-behavior-y: contain; text-transform: lowercase;
+            display: flex; flex-direction: column; height: 100vh;
+        }
+        #messageInput, .message-bubble p, #emojiSearchInput { text-transform: none; }
+        .material-icons, .material-icons-outlined { vertical-align: middle; }
+        .bg-accent { background-color: var(--accent-color); }
+        .text-accent { color: var(--accent-color); }
+        .border-accent { border-color: var(--accent-color); }
+        .ring-accent:focus { ring-color: var(--accent-color); }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-light); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #bdbdbd; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #9e9e9e; }
+
+        .ripple {
+            background-position: center;
+            transition: background 0.5s, transform 0.2s ease-out;
+        }
+        .ripple:hover {
+            background: var(--accent-color-dark) radial-gradient(circle, transparent 1%, var(--accent-color-dark) 1%) center/15000%;
+            transform: scale(1.03);
+        }
+        .ripple:active {
+            background-color: #66bb6a; background-size: 100%;
+            transform: scale(0.98); transition: background 0s, transform 0.1s;
+        }
+        
+        .chat-input:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.3);
+        }
+
+        .message-item {
+            transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease-out;
+        }
+        .message-item.sent-animation { transform: translateX(100px); opacity: 0; }
+        .message-item.received-animation { transform: translateX(-100px); opacity: 0; }
+        .message-item.system-animation { transform: scale(0.9); opacity: 0; }
+        .message-item.show { transform: translateX(0) scale(1); opacity: 1; }
+
+
+        .message-bubble { max-width: 75%; }
+        .message-bubble.sent {
+            background-color: var(--accent-color); color: white;
+            margin-left: auto; border-radius: 20px 20px 5px 20px;
+        }
+        .message-bubble.received { 
+            background-color: var(--bg-default); color: var(--text-primary);
+            margin-right: auto; border-radius: 20px 20px 20px 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .message-bubble.system {
+            background-color: transparent; color: var(--text-secondary);
+            font-size: 0.8rem; font-style: italic; text-align: center;
+            width: 100%; max-width: 100%; padding: 4px 0;
+            box-shadow: none;
+        }
+        .message-avatar {
+            width: 32px; height: 32px; min-width: 32px;
+            border-radius: 50%; object-fit: cover;
+            border: 2px solid var(--bg-default);
+            transition: transform 0.3s ease;
+        }
+        .message-image {
+            max-width: 100%; max-height: 250px;
+            border-radius: 10px; margin-top: 8px; cursor: pointer;
+            transition: transform 0.2s ease-in-out;
+        }
+        .message-image:hover { transform: scale(1.05); }
+
+        .modal-bg-enter { opacity: 0; }
+        .modal-bg-enter-active { opacity: 0.75; transition: opacity 300ms ease-out; }
+        .modal-bg-leave-active { opacity: 0; transition: opacity 200ms ease-in; }
+        .modal-content-enter { opacity: 0; transform: scale(0.9) translateY(20px); }
+        .modal-content-enter-active { opacity: 1; transform: scale(1) translateY(0); transition: opacity 300ms ease-out, transform 300ms cubic-bezier(0.25, 0.8, 0.25, 1); }
+        .modal-content-leave-active { opacity: 0; transform: scale(0.9); transition: opacity 200ms ease-in, transform 200ms ease-in; }
+
+        #imagePreviewModal { background-color: transparent; }
+        #imagePreviewModal img { 
+            max-height: 90vh; max-width: 90vw; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: 8px; text-transform: none;
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease-out;
+        }
+        
+        .file-input-button {
+            background-color: var(--accent-color); color: white;
+            padding: 0.5rem 1rem; border-radius: 0.375rem; 
+            cursor: pointer; transition: background-color 0.2s, transform 0.2s ease-out;
+        }
+        .file-input-button:hover { background-color: var(--accent-color-dark); transform: scale(1.03); }
+
+        .loader {
+            border-radius: 50%; width: 20px; height: 20px;
+            animation: spin 0.8s linear infinite;
+            display: inline-block; vertical-align: middle;
+        }
+        .button-loader { border: 3px solid rgba(255,255,255,0.3); border-top-color: #fff; }
+        .attach-loader { border: 2px solid var(--accent-color); border-top-color: transparent; width:18px; height:18px; margin-left: 5px;}
+
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .dark {
+            --text-primary: #f3f4f6; --text-secondary: #9ca3af; 
+            --bg-light: #1f2937; --bg-default: #374151; --divider-color: #4b5563; 
+        }
+        .dark ::-webkit-scrollbar-track { background: var(--bg-default); }
+        .dark ::-webkit-scrollbar-thumb { background: #6b7280; }
+        .dark ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+        .dark .message-avatar { border-color: var(--bg-light); }
+        
+        #connectionStatus {
+            padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 500;
+            position: fixed; top: 10px; right: 10px; z-index: 1000; text-transform: uppercase; 
+            opacity: 0; transform: translateY(-20px);
+            transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+        }
+        #connectionStatus.visible { opacity: 1; transform: translateY(0); }
+        #connectionStatus.connected { background-color: var(--accent-color); color: white; }
+        #connectionStatus.disconnected { background-color: #ef4444; color: white; }
+        #connectionStatus.connecting { background-color: #eab308; color: #422006; }
+
+        #chatAppContainer { display: flex; flex: 1; overflow: hidden; }
+        #chatApp > header { transform: translateY(-100%); transition: transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1); }
+        #chatApp > footer { transform: translateY(100%); transition: transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1); }
+        #chatApp.app-loaded > header, #chatApp.app-loaded > footer { transform: translateY(0); }
+
+        #profilePicPreview { transition: opacity 0.4s ease-in-out, transform 0.3s ease; }
+        #profilePicPreview.loading { opacity: 0.5; transform: scale(0.95); }
+
+        #themeToggleButton, #attachFileButtonWrapper > button, #sendMessageButton > span.material-icons, #emojiButton {
+            transition: transform 0.2s ease-out;
+        }
+        #themeToggleButton:hover, #attachFileButtonWrapper > button:hover, 
+        #sendMessageButton:hover > span.material-icons, #emojiButton:hover {
+            transform: scale(1.15);
+        }
+
+        /* User List Sidebar */
+        #userListSidebar {
+            width: 0; min-width: 0; background-color: var(--bg-default);
+            border-right: 1px solid var(--divider-color);
+            transition: min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+            opacity: 0; overflow: hidden; 
+        }
+        #userListSidebar.open { min-width: 240px; opacity: 1; }
+        .user-list-item { transition: background-color 0.2s ease-in-out; }
+        .user-list-item:hover { background-color: var(--bg-light); }
+        .online-dot { width: 8px; height: 8px; background-color: var(--accent-color); border-radius: 50%; border: 1.5px solid var(--bg-default); }
+        .typing-text { font-size: 0.7rem; font-style: italic; color: var(--text-secondary); }
+
+        /* Emoji Picker */
+        #emojiPicker {
+            position: absolute; bottom: 65px; left: 10px; width: 300px; max-height: 250px;
+            background-color: var(--bg-default); border: 1px solid var(--divider-color);
+            border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 100; overflow-y: auto; padding: 8px;
+            opacity: 0; transform: translateY(10px) scale(0.95);
+            transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+            pointer-events: none;
+        }
+        #emojiPicker.visible { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+        .emoji-category { margin-bottom: 8px; }
+        .emoji-category-title { font-size: 0.8rem; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary); }
+        .emoji-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); gap: 4px; }
+        .emoji-item {
+            padding: 6px; font-size: 1.25rem; text-align: center;
+            border-radius: 4px; cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+        .emoji-item:hover { background-color: var(--bg-light); }
+        #emojiSearchInput {
+            width: calc(100% - 16px); margin: 0 8px 8px 8px; padding: 6px 10px;
+            border-radius: 6px; border: 1px solid var(--divider-color);
+            background-color: var(--bg-light);
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden"> 
+    <div id="connectionStatus">disconnected</div>
+
+    <!-- Initial User Setup Modal -->
+    <div id="userSetupModal" class="fixed inset-0 flex items-center justify-center z-50 p-4">
+        <div id="userSetupModalBackdrop" class="absolute inset-0 bg-gray-900 opacity-0"></div>
+        <div id="userSetupModalContent" class="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-md transform opacity-0 scale-90">
+            <div class="text-center">
+                <span class="material-icons-outlined text-5xl text-accent mb-3">groups</span>
+                <h2 class="text-2xl font-semibold mb-2 text-gray-800 dark:text-gray-100">welcome to chromachat!</h2>
+                <p class="text-gray-600 dark:text-gray-300 mb-6">let's get you set up.</p>
+            </div>
+            <div class="space-y-5">
+                <div>
+                    <label for="usernameInput" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">choose a nickname</label>
+                    <div class="relative">
+                        <span class="material-icons-outlined absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500">person_outline</span>
+                        <input type="text" id="usernameInput" placeholder="e.g., chattycathy" class="w-full pl-10 pr-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 ring-accent focus:border-accent transition duration-150 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">profile picture (optional)</label>
+                    <div class="flex items-center space-x-3">
+                        <img id="profilePicPreview" src="https://placehold.co/80x80/374151/f3f4f6?text=avatar" alt="avatar preview" class="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600">
+                        <label for="profilePicInput" class="file-input-button flex items-center space-x-2">
+                            <span class="material-icons-outlined text-lg">upload_file</span>
+                            <span>choose file</span>
+                        </label>
+                        <input type="file" id="profilePicInput" accept="image/png, image/jpeg, image/webp, image/gif" class="hidden" aria-label="profile picture file input">
+                    </div>
+                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">png, jpg, gif, webp. max 1mb.</p>
+                </div>
+            </div>
+            <button id="joinChatButton" class="w-full bg-accent text-white py-3 mt-8 rounded-lg font-semibold ripple focus:outline-none focus:ring-2 focus:ring-offset-2 ring-accent transition duration-150 text-lg flex items-center justify-center space-x-2" aria-label="start chatting">
+                <span class="material-icons-outlined default-icon">chat</span>
+                <span class="button-text">start chatting</span>
+                <div class="loader button-loader hidden"></div>
+            </button>
+            <p id="setupError" class="text-red-500 text-sm mt-3 text-center"></p>
+        </div>
+    </div>
+    
+    <div id="chatAppContainer" class="hidden flex-1">
+        <aside id="userListSidebar" class="flex-col p-3 space-y-2 overflow-y-auto">
+            <h3 class="text-lg font-semibold text-accent mb-2 sticky top-0 bg-inherit py-1">online users</h3>
+            <div id="userList" class="space-y-1.5">
+                <!-- Real users will be injected here by Socket.IO events -->
+            </div>
+        </aside>
+
+        <main id="chatApp" class="flex flex-1 flex-col h-full overflow-hidden">
+            <header class="bg-white dark:bg-gray-800 border-b border-divider-color dark:border-l dark:border-gray-700 p-3 sm:p-4 flex items-center justify-between shadow-sm">
+                <div class="flex items-center">
+                     <button id="toggleUserListButton" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none mr-2" aria-label="toggle user list">
+                        <span class="material-icons-outlined text-gray-600 dark:text-gray-300">menu</span>
+                    </button>
+                    <h1 class="text-xl sm:text-2xl font-semibold text-accent flex items-center">
+                        <span class="material-icons-outlined mr-2 text-3xl">forum</span>
+                        chromachat
+                    </h1>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button id="themeToggleButton" title="toggle theme" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none" aria-label="toggle theme">
+                        <span class="material-icons-outlined text-gray-600 dark:text-gray-300">brightness_6</span>
+                    </button>
+                    <img id="currentUserAvatar" src="https://placehold.co/40x40/374151/f3f4f6?text=me" alt="my avatar" class="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover cursor-pointer border-2 border-accent">
+                </div>
+            </header>
+
+            <div id="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900" aria-live="polite">
+            </div>
+            <div id="typingIndicatorArea" class="h-6 px-4 pb-1 text-sm text-gray-500 dark:text-gray-400 flex items-center">
+            </div>
+
+            <footer class="bg-white dark:bg-gray-800 border-t border-divider-color dark:border-l dark:border-gray-700 p-3 sm:p-4 relative">
+                 <div id="emojiPicker" class="hidden">
+                    <input type="text" id="emojiSearchInput" placeholder="search emojis..." class="focus:ring-accent focus:border-accent">
+                    <div id="emojiGridContainer"></div>
+                 </div>
+                <div class="flex items-center space-x-2 sm:space-x-3">
+                    <button id="emojiButton" title="emojis" class="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none text-gray-500 dark:text-gray-400" aria-label="select emoji">
+                        <span class="material-icons-outlined text-2xl">sentiment_satisfied</span>
+                    </button>
+                    <div id="attachFileButtonWrapper" class="relative">
+                        <button id="attachFileButtonTrigger" title="attach image" class="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none text-accent" aria-label="attach image">
+                            <span class="material-icons-outlined text-2xl">attach_file</span>
+                        </button>
+                        <div id="attachFileLoader" class="loader attach-loader absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden"></div>
+                    </div>
+                    <input type="file" id="imageFileInput" accept="image/png, image/jpeg, image/webp, image/gif" class="hidden" aria-label="image file input">
+                    
+                    <input type="text" id="messageInput" placeholder="type a message..." class="flex-1 p-3 border border-gray-300 dark:border-gray-600 rounded-full focus:outline-none chat-input transition duration-150 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" aria-label="message input">
+                    
+                    <button id="sendMessageButton" class="bg-accent text-white rounded-full p-3 ripple focus:outline-none focus:ring-2 focus:ring-offset-1 ring-accent transition duration-150" aria-label="send message">
+                        <span class="material-icons text-2xl">send</span>
+                    </button>
+                </div>
+            </footer>
+        </main>
+    </div>
+
+    <div id="imagePreviewModal" class="fixed inset-0 flex items-center justify-center z-50 p-4 hidden">
+        <div id="imagePreviewModalBackdrop" class="absolute inset-0 bg-black opacity-0"></div>
+        <img id="fullScreenImage" src="" alt="full screen preview" class="max-w-full max-h-full rounded-lg shadow-xl z-10 transform opacity-0 scale-90">
+        <button id="closeImagePreviewButton" class="absolute top-4 right-4 text-white text-3xl z-20 p-2 rounded-full bg-black bg-opacity-50 hover:bg-opacity-75" aria-label="close image preview">
+            <span class="material-icons">close</span>
+        </button>
+    </div>
+
+    <script>
+        // DOM Elements (ensure all are captured)
+        const userSetupModal = document.getElementById('userSetupModal');
+        const userSetupModalBackdrop = document.getElementById('userSetupModalBackdrop');
+        const userSetupModalContent = document.getElementById('userSetupModalContent');
+        const usernameInput = document.getElementById('usernameInput');
+        const profilePicInput = document.getElementById('profilePicInput');
+        const profilePicPreview = document.getElementById('profilePicPreview');
+        const joinChatButton = document.getElementById('joinChatButton');
+        const joinChatButtonDefaultIcon = joinChatButton.querySelector('.default-icon');
+        const joinChatButtonText = joinChatButton.querySelector('.button-text');
+        const joinChatButtonLoader = joinChatButton.querySelector('.button-loader');
+        const setupError = document.getElementById('setupError');
+        
+        const chatAppContainer = document.getElementById('chatAppContainer');
+        const chatApp = document.getElementById('chatApp'); // Main chat area (not the container with sidebar)
+        const messagesContainer = document.getElementById('messagesContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendMessageButton = document.getElementById('sendMessageButton');
+        const currentUserAvatar = document.getElementById('currentUserAvatar');
+        const connectionStatusDiv = document.getElementById('connectionStatus');
+        const userListSidebar = document.getElementById('userListSidebar');
+        const userListDiv = document.getElementById('userList');
+        const toggleUserListButton = document.getElementById('toggleUserListButton');
+        const typingIndicatorArea = document.getElementById('typingIndicatorArea');
+
+        const attachFileButtonWrapper = document.getElementById('attachFileButtonWrapper');
+        const attachFileButtonTrigger = document.getElementById('attachFileButtonTrigger');
+        const attachFileLoader = document.getElementById('attachFileLoader');
+        const imageFileInput = document.getElementById('imageFileInput');
+
+        const imagePreviewModal = document.getElementById('imagePreviewModal');
+        const imagePreviewModalFullImg = document.getElementById('fullScreenImage');
+        const imagePreviewModalFullImgBackdrop = document.getElementById('imagePreviewModalBackdrop');
+        const closeImagePreviewButton = document.getElementById('closeImagePreviewButton');
+        const themeToggleButton = document.getElementById('themeToggleButton');
+
+        const emojiButton = document.getElementById('emojiButton');
+        const emojiPicker = document.getElementById('emojiPicker');
+        const emojiGridContainer = document.getElementById('emojiGridContainer');
+        const emojiSearchInput = document.getElementById('emojiSearchInput');
+
+        // --- State ---
+        let userProfile = {
+            username: null, 
+            profilePicDataUrl: 'https://placehold.co/80x80/374151/f3f4f6?text=avatar',
+            id: null // Will be set by server upon connection or use a client-generated one initially
+        };
+        let messages = []; 
+        let tempImageFileDataUrl = null; 
+        let socket = null; // Socket.IO instance
+        const SERVER_URL = 'http://localhost:3001'; // Your backend server URL
+        let notificationSound = null;
+        let typingTimeout = null;
+        let onlineUsers = {}; // Store online users: { userId: {username, profilePicDataUrl, typing} }
+
+        const THEME_KEY = 'chromaChatThemePreference';
+        
+        // --- Sound Initialization ---
+        function initializeSounds() { /* ... same as before ... */ }
+        function playNotificationSound() { /* ... same as before ... */ }
+
+        // --- Notifications ---
+        function requestNotificationPermission() { /* ... same as before ... */ }
+        function showNotification(title, body, icon) { /* ... same as before ... */ }
+
+        // --- Socket.IO Connection & Status ---
+        function updateConnectionStatus(status, message = '') { /* ... same as before ... */ }
+
+        function connectToServer() {
+            if (socket && socket.connected) {
+                console.log("already connected to server.");
+                return;
+            }
+            updateConnectionStatus('connecting');
+            console.log(`attempting to connect to server: ${SERVER_URL}`);
+            
+            // 2. Initialize Socket.IO client connection
+            socket = io(SERVER_URL, {
+                reconnectionAttempts: 5, // Try to reconnect a few times
+                transports: ['websocket'] // Prefer WebSocket
+            });
+
+            // --- Socket.IO Event Handlers ---
+            socket.on('connect', () => {
+                userProfile.id = socket.id; // Use socket ID as user ID for this session
+                updateConnectionStatus('connected');
+                console.log(`connected to server with id: ${userProfile.id}`);
+                // If user profile is already set (e.g. from a previous incomplete setup), send it
+                if (userProfile.username) {
+                    socket.emit('user_setup', {
+                        username: userProfile.username,
+                        profilePicDataUrl: userProfile.profilePicDataUrl
+                        // id is implicitly socket.id on server
+                    });
+                }
+            });
+
+            socket.on('disconnect', (reason) => {
+                updateConnectionStatus('disconnected', reason);
+                console.log(`disconnected from server: ${reason}`);
+                onlineUsers = {}; // Clear user list on disconnect
+                renderUserList();
+                typingIndicatorArea.textContent = '';
+            });
+
+            socket.on('connect_error', (err) => {
+                updateConnectionStatus('error', err.message);
+                console.error(`connection error: ${err.message}`);
+            });
+            
+            socket.on('current_users', (usersArray) => {
+                onlineUsers = {}; // Reset
+                usersArray.forEach(user => onlineUsers[user.id] = user);
+                renderUserList();
+            });
+
+            socket.on('update_user_list', (usersArray) => {
+                onlineUsers = {}; // Reset
+                usersArray.forEach(user => onlineUsers[user.id] = user);
+                renderUserList();
+            });
+
+            socket.on('user_joined', (userData) => {
+                if (userData.id === userProfile.id) return; // Don't show notification for self
+                onlineUsers[userData.id] = userData;
+                renderUserList();
+                addSystemMessage(`${userData.username} joined the chat.`);
+            });
+
+            socket.on('user_left', (userData) => {
+                if (!onlineUsers[userData.userId]) return; // Already processed or not in list
+                const leftUsername = onlineUsers[userData.userId]?.username || userData.username || 'a user';
+                delete onlineUsers[userData.userId];
+                renderUserList();
+                addSystemMessage(`${leftUsername} left the chat.`);
+                updateTypingIndicator(); // Clear if the leaver was typing
+            });
+
+            socket.on('new_chat_message', (msgData) => {
+                const isSentByCurrentUser = msgData.userId === userProfile.id;
+                addMessageToLocalListAndUI({ ...msgData, isSentByCurrentUser }, true);
+                if (!isSentByCurrentUser) {
+                    playNotificationSound();
+                    showNotification(`new message from ${msgData.username}`, msgData.text, msgData.profilePicDataUrl);
+                }
+            });
+
+            socket.on('user_typing', (typingData) => {
+                if (onlineUsers[typingData.userId] && typingData.userId !== userProfile.id) {
+                    onlineUsers[typingData.userId].typing = true;
+                    renderUserList(); // Update list to show typing
+                    updateTypingIndicator();
+                }
+            });
+
+            socket.on('user_stopped_typing', (typingData) => {
+                 if (onlineUsers[typingData.userId] && typingData.userId !== userProfile.id) {
+                    onlineUsers[typingData.userId].typing = false;
+                    renderUserList(); // Update list
+                    updateTypingIndicator();
+                }
+            });
+        }
+
+        // --- App Initialization ---
+        function initializeApp() {
+            applyTheme(loadThemePreference()); 
+            initializeSounds();
+            requestNotificationPermission();
+            // User list will be rendered by server events
+
+            if (userProfile.username && userProfile.id) { // If reloaded and had a profile and ID
+                currentUserAvatar.src = userProfile.profilePicDataUrl;
+                hideUserSetupModal();
+                connectToServer(); // Attempt to reconnect
+                // Messages will be loaded by server if persistence is added later
+            } else {
+                showUserSetupModal(true);
+            }
+            setupEmojiPicker();
+        }
+
+        // --- User Profile & Setup ---
+        async function handleJoinChat() {
+            joinChatButtonDefaultIcon.classList.add('hidden');
+            joinChatButtonText.classList.add('hidden');
+            joinChatButtonLoader.classList.remove('hidden');
+            joinChatButton.disabled = true;
+
+            const username = usernameInput.value.trim();
+            if (!username) { setupError.textContent = "nickname cannot be empty."; resetJoinButton(); return false; }
+            if (username.length > 20) { setupError.textContent = "nickname too long."; resetJoinButton(); return false; }
+            
+            userProfile.username = username;
+            const file = profilePicInput.files[0];
+            if (file) {
+                if (file.size > 1 * 1024 * 1024) { setupError.textContent = "image too large."; resetJoinButton(); return false; }
+                try {
+                    profilePicPreview.classList.add('loading');
+                    userProfile.profilePicDataUrl = await readFileAsDataURL(file);
+                    profilePicPreview.src = userProfile.profilePicDataUrl; 
+                    profilePicPreview.classList.remove('loading');
+                } catch (error) { setupError.textContent = "could not process image."; profilePicPreview.classList.remove('loading'); resetJoinButton(); return false; }
+            } else {
+                 userProfile.profilePicDataUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(userProfile.username)}&background=4caf50&color=fff&size=128&font-size=0.4&format=svg&text-transform=lowercase`;
+                 profilePicPreview.src = userProfile.profilePicDataUrl;
+            }
+            
+            currentUserAvatar.src = userProfile.profilePicDataUrl;
+            
+            // If socket is already connected (e.g. user refreshed after connecting), emit setup
+            // Otherwise, connectToServer will handle emitting setup on 'connect'
+            if (socket && socket.connected) {
+                 socket.emit('user_setup', {
+                    username: userProfile.username,
+                    profilePicDataUrl: userProfile.profilePicDataUrl
+                });
+            } else {
+                connectToServer(); // This will trigger user_setup on successful connection
+            }
+            
+            resetJoinButton();
+            return true;
+        }
+        function resetJoinButton() { /* ... same as before ... */ }
+        profilePicInput.addEventListener('change', async (e) => { /* ... same as before ... */ });
+        joinChatButton.addEventListener('click', async () => { if (await handleJoinChat()) hideUserSetupModal(); });
+        function showUserSetupModal(initial = false) { /* ... same as before ... */ }
+        function hideUserSetupModal() { /* ... same as before ... */ }
+        
+        // --- Message Handling ---
+        function renderMessages() { /* ... same as before ... */ }
+
+        async function handleSendMessage() {
+            if (!userProfile.username || !socket || !socket.connected) {
+                // Optionally show an error message if not connected
+                console.warn("Cannot send message: profile not set or not connected.");
+                return;
+            }
+            const text = messageInput.value.trim();
+            let imageFileDataUrlToSend = tempImageFileDataUrl; 
+            if (!text && !imageFileDataUrlToSend) return;
+
+            // Optimistic message object (server will add/override some fields)
+            const clientMessage = {
+                // id will be assigned by server or use a temp client one for optimistic UI
+                // For now, let server assign ID for simplicity in handling echoes.
+                // tempId: `temp_${userProfile.id}_${Date.now()}`,
+                userId: userProfile.id, // Client knows its ID from socket.id
+                username: userProfile.username,
+                profilePicDataUrl: userProfile.profilePicDataUrl,
+                text: text,
+                imageUrl: imageFileDataUrlToSend, 
+                timestamp: new Date().toISOString(), // Client timestamp for optimistic display
+                // isSentByCurrentUser: true // Will be determined when displaying
+            };
+            
+            // Emit to server
+            socket.emit('chat_message', clientMessage);
+            
+            // Optimistic UI update for the sender
+            // addMessageToLocalListAndUI({ ...clientMessage, isSentByCurrentUser: true }, true);
+            // Server will broadcast it back, including to sender, so sender will get it via 'new_chat_message'
+            // This avoids potential duplicate display if server is quick.
+
+            if (typingTimeout) clearTimeout(typingTimeout);
+            socket.emit('stop_typing');
+
+
+            messageInput.value = ''; imageFileInput.value = ''; 
+            tempImageFileDataUrl = null; 
+            attachFileButtonTrigger.classList.remove('text-green-400'); 
+            attachFileLoader.classList.add('hidden');
+            messageInput.focus();
+        }
+        
+        function addMessageToLocalListAndUI(msg, animate = true) {
+            const existingMsgIndex = messages.findIndex(m => m.id === msg.id);
+            if (existingMsgIndex === -1) { messages.push(msg); }
+            else { messages[existingMsgIndex] = msg; } 
+            
+            // Re-render all messages to ensure order and avoid duplicates in UI from simple append
+            // This is less efficient but simpler for managing server broadcasts
+            renderMessages(); 
+        }
+
+        function addSystemMessage(text) {
+            const systemMessage = {
+                id: `system_${Date.now()}`,
+                text: text,
+                timestamp: new Date().toISOString(),
+                isSystem: true,
+                isSentByCurrentUser: false // System messages are never "sent by current user"
+            };
+            addMessageToLocalListAndUI(systemMessage, true);
+        }
+
+        // --- UI Updates (Messages, User List, Typing) ---
+        function formatTimestamp(isoTimestamp, timezone = 'Europe/Bucharest') { /* ... same as before ... */ }
+
+        function createMessageElement(msg) {
+            const isSent = msg.userId === userProfile.id; // Determine if sent by current user
+            const messageWrapper = document.createElement('div');
+            messageWrapper.classList.add('message-item');
+            if (msg.isSystem) {
+                messageWrapper.classList.add('system-animation');
+            } else {
+                messageWrapper.classList.add(isSent ? 'sent-animation' : 'received-animation');
+            }
+            messageWrapper.dataset.messageId = msg.id;
+
+            if (msg.isSystem) {
+                const systemDiv = document.createElement('div');
+                systemDiv.classList.add('message-bubble', 'system', 'p-2', 'my-1', 'text-center', 'text-xs', 'text-gray-500', 'dark:text-gray-400');
+                systemDiv.textContent = msg.text;
+                messageWrapper.appendChild(systemDiv);
+                return messageWrapper;
+            }
+
+
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('flex', 'items-end', 'gap-2', 'max-w-[85%]', 'sm:max-w-[75%]');
+             if(isSent) messageDiv.classList.add('ml-auto'); else messageDiv.classList.add('mr-auto');
+            
+            const avatarImg = document.createElement('img');
+            avatarImg.src = msg.profilePicDataUrl || (isSent ? userProfile.profilePicDataUrl : 'https://placehold.co/32x32/757575/E0E0E0?text=U');
+            avatarImg.alt = msg.username;
+            avatarImg.classList.add('message-avatar', 'shadow');
+            if (isSent) avatarImg.classList.add('order-2');
+
+            const contentBubble = document.createElement('div');
+            contentBubble.classList.add('message-bubble', isSent ? 'sent' : 'received', 'p-3', 'shadow-md');
+            
+            const usernameSpan = document.createElement('span');
+            usernameSpan.classList.add('block', 'text-xs', 'font-semibold', 'mb-1');
+            usernameSpan.style.textTransform = 'none'; 
+            if (isSent) {
+                usernameSpan.classList.add('text-green-100'); usernameSpan.textContent = 'you'; 
+            } else {
+                usernameSpan.classList.add('text-accent'); usernameSpan.textContent = msg.username;
+            }
+            
+            const textP = document.createElement('p');
+            textP.classList.add('text-sm', 'whitespace-pre-wrap', 'break-words');
+            textP.textContent = msg.text || '';
+
+            contentBubble.appendChild(usernameSpan); contentBubble.appendChild(textP);
+
+            if (msg.imageUrl) { /* ... same as before ... */ }
+            
+            const timestampSpan = document.createElement('span');
+            timestampSpan.classList.add('block', 'text-xs', 'mt-1.5', isSent ? 'text-green-50 opacity-80 text-right' : 'text-gray-500 dark:text-gray-400 text-left');
+            timestampSpan.textContent = formatTimestamp(msg.serverTimestamp || msg.timestamp); // Prefer server timestamp
+            contentBubble.appendChild(timestampSpan);
+
+            if (isSent) { messageDiv.appendChild(contentBubble); messageDiv.appendChild(avatarImg); }
+            else { messageDiv.appendChild(avatarImg); messageDiv.appendChild(contentBubble); }
+            messageWrapper.appendChild(messageDiv);
+            return messageWrapper;
+        }
+
+        function addMessageToUI(msg, animate = true, isInitialLoad = false) { /* ... same as before ... */ }
+        function scrollToBottom() { /* ... same as before ... */ }
+        function readFileAsDataURL(file) { /* ... same as before ... */ }
+        attachFileButtonTrigger.addEventListener('click', () => imageFileInput.click());
+        imageFileInput.addEventListener('change', async (e) => { /* ... same as before ... */ });
+        function showImagePreview(src) { /* ... same as before ... */ }
+        function closeImagePreview() { /* ... same as before ... */ }
+        closeImagePreviewButton.addEventListener('click', closeImagePreview);
+        imagePreviewModalFullImgBackdrop.addEventListener('click', closeImagePreview);
+        function applyTheme(theme) { /* ... same as before ... */ }
+        function toggleTheme() { /* ... same as before ... */ }
+        function loadThemePreference() { return localStorage.getItem(THEME_KEY) || 'dark'; }
+        themeToggleButton.addEventListener('click', toggleTheme);
+
+        // --- User List & Typing Indicator ---
+        function renderUserList() {
+            userListDiv.innerHTML = '';
+            const usersToDisplay = Object.values(onlineUsers);
+            
+            // Sort: current user first, then alphabetically
+            usersToDisplay.sort((a, b) => {
+                if (a.id === userProfile.id) return -1;
+                if (b.id === userProfile.id) return 1;
+                return a.username.localeCompare(b.username);
+            });
+
+            usersToDisplay.forEach(user => {
+                const userItem = document.createElement('div');
+                userItem.classList.add('user-list-item', 'flex', 'items-center', 'p-2', 'rounded-md', 'cursor-default');
+                if (user.id === userProfile.id) {
+                    userItem.classList.add('bg-green-50', 'dark:bg-green-900');
+                }
+                userItem.innerHTML = `
+                    <img src="${user.profilePicDataUrl}" alt="${user.username}" class="w-7 h-7 rounded-full mr-2.5 object-cover">
+                    <div class="flex-1 truncate">
+                        <span class="text-sm font-medium">${user.username} ${user.id === userProfile.id ? '(you)' : ''}</span>
+                        <div class="typing-text ${user.typing ? '' : 'hidden'}">typing...</div>
+                    </div>
+                    <div class="online-dot ml-auto"></div>
+                `;
+                userListDiv.appendChild(userItem);
+            });
+        }
+
+        function updateTypingIndicator() {
+            const typingUsers = Object.values(onlineUsers).filter(u => u.typing && u.id !== userProfile.id);
+            if (typingUsers.length > 0) {
+                const names = typingUsers.map(u => u.username);
+                let text;
+                if (names.length === 1) text = `${names[0]} is typing...`;
+                else if (names.length === 2) text = `${names.join(' and ')} are typing...`;
+                else text = `${names.slice(0,1).join(', ')} & others are typing...`;
+                typingIndicatorArea.textContent = text;
+            } else {
+                typingIndicatorArea.textContent = '';
+            }
+        }
+        
+        messageInput.addEventListener('input', () => {
+            if (!socket || !socket.connected) return;
+            if (typingTimeout) clearTimeout(typingTimeout);
+            socket.emit('start_typing');
+            typingTimeout = setTimeout(() => {
+                socket.emit('stop_typing');
+            }, 2000); // Auto-stop typing after 2 seconds of no input
+        });
+        
+        toggleUserListButton.addEventListener('click', () => userListSidebar.classList.toggle('open'));
+
+        // --- Emoji Picker ---
+        const emojis = { /* ... same as before ... */ };
+        function renderEmojiPicker(searchTerm = "") { /* ... same as before ... */ }
+        function setupEmojiPicker() { /* ... same as before ... */ }
+
+        // --- Event Listeners & Init ---
+        sendMessageButton.addEventListener('click', handleSendMessage);
+        messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }});
+        window.onload = initializeApp;
+        window.onbeforeunload = () => { if (socket && socket.connected) socket.disconnect(); if(typingTimeout) clearTimeout(typingTimeout); };
+    </script>
+</body>
+</html>
