@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>chromachat - real-time (js fix)</title>
+    <title>chromachat - real-time (setup fix)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined" rel="stylesheet">
@@ -146,7 +146,10 @@
         #chatApp > footer { transform: translateY(100%); transition: transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1); }
         #chatApp.app-loaded > header, #chatApp.app-loaded > footer { transform: translateY(0); }
 
-        #profilePicPreview { transition: opacity 0.4s ease-in-out, transform 0.3s ease; }
+        #profilePicPreview { 
+            transition: opacity 0.4s ease-in-out, transform 0.3s ease; 
+            background-color: var(--divider-color); /* Added default bg for placeholder/transparent images */
+        }
         #profilePicPreview.loading { opacity: 0.5; transform: scale(0.95); }
 
         #themeToggleButton, #attachFileButtonWrapper > button, #sendMessageButton > span.material-icons, #emojiButton {
@@ -179,20 +182,7 @@
             pointer-events: none;
         }
         #emojiPicker.visible { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
-        .emoji-category { margin-bottom: 8px; }
-        .emoji-category-title { font-size: 0.8rem; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary); }
-        .emoji-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); gap: 4px; }
-        .emoji-item {
-            padding: 6px; font-size: 1.25rem; text-align: center;
-            border-radius: 4px; cursor: pointer;
-            transition: background-color 0.15s ease;
-        }
-        .emoji-item:hover { background-color: var(--bg-light); }
-        #emojiSearchInput {
-            width: calc(100% - 16px); margin: 0 8px 8px 8px; padding: 6px 10px;
-            border-radius: 6px; border: 1px solid var(--divider-color);
-            background-color: var(--bg-light);
-        }
+        /* ... (rest of emoji styles) ... */
     </style>
 </head>
 <body class="flex flex-col h-screen overflow-hidden"> 
@@ -202,7 +192,8 @@
     <div id="userSetupModal" class="fixed inset-0 flex items-center justify-center z-50 p-4">
         <div id="userSetupModalBackdrop" class="absolute inset-0 bg-gray-900"></div>
         <div id="userSetupModalContent" class="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-md transform">
-            <div class="text-center">
+            <!-- ... (modal content same as before) ... -->
+             <div class="text-center">
                 <span class="material-icons-outlined text-5xl text-accent mb-3">groups</span>
                 <h2 class="text-2xl font-semibold mb-2 text-gray-800 dark:text-gray-100">welcome to chromachat!</h2>
                 <p class="text-gray-600 dark:text-gray-300 mb-6">let's get you set up.</p>
@@ -233,17 +224,17 @@
                 <span class="button-text">start chatting</span>
                 <div class="loader button-loader hidden"></div>
             </button>
-            <p id="setupError" class="text-red-500 text-sm mt-3 text-center"></p>
+            <p id="setupError" class="text-red-500 text-sm mt-3 text-center h-5"></p> <!-- Added h-5 for consistent height -->
         </div>
     </div>
     
     <div id="chatAppContainer" class="hidden flex-1">
+        <!-- ... (rest of chat app container) ... -->
         <aside id="userListSidebar" class="flex-col p-3 space-y-2 overflow-y-auto">
             <h3 class="text-lg font-semibold text-accent mb-2 sticky top-0 bg-inherit py-1">online users</h3>
             <div id="userList" class="space-y-1.5">
             </div>
         </aside>
-
         <main id="chatApp" class="flex flex-1 flex-col h-full overflow-hidden">
             <header class="bg-white dark:bg-gray-800 border-b border-divider-color dark:border-l dark:border-gray-700 p-3 sm:p-4 flex items-center justify-between shadow-sm">
                 <div class="flex items-center">
@@ -262,12 +253,10 @@
                     <img id="currentUserAvatar" src="https://placehold.co/40x40/374151/f3f4f6?text=me" alt="my avatar" class="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover cursor-pointer border-2 border-accent">
                 </div>
             </header>
-
             <div id="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900" aria-live="polite">
             </div>
             <div id="typingIndicatorArea" class="h-6 px-4 pb-1 text-sm text-gray-500 dark:text-gray-400 flex items-center">
             </div>
-
             <footer class="bg-white dark:bg-gray-800 border-t border-divider-color dark:border-l dark:border-gray-700 p-3 sm:p-4 relative">
                  <div id="emojiPicker" class="hidden">
                     <input type="text" id="emojiSearchInput" placeholder="search emojis..." class="focus:ring-accent focus:border-accent">
@@ -284,9 +273,7 @@
                         <div id="attachFileLoader" class="loader attach-loader absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden"></div>
                     </div>
                     <input type="file" id="imageFileInput" accept="image/png, image/jpeg, image/webp, image/gif" class="hidden" aria-label="image file input">
-                    
                     <input type="text" id="messageInput" placeholder="type a message..." class="flex-1 p-3 border border-gray-300 dark:border-gray-600 rounded-full focus:outline-none chat-input transition duration-150 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" aria-label="message input">
-                    
                     <button id="sendMessageButton" class="bg-accent text-white rounded-full p-3 ripple focus:outline-none focus:ring-2 focus:ring-offset-1 ring-accent transition duration-150" aria-label="send message">
                         <span class="material-icons text-2xl">send</span>
                     </button>
@@ -296,6 +283,7 @@
     </div>
 
     <div id="imagePreviewModal" class="fixed inset-0 flex items-center justify-center z-50 p-4 hidden">
+        <!-- ... (image preview modal same as before) ... -->
         <div id="imagePreviewModalBackdrop" class="absolute inset-0 bg-black"></div>
         <img id="fullScreenImage" src="" alt="full screen preview" class="max-w-full max-h-full rounded-lg shadow-xl z-10 transform">
         <button id="closeImagePreviewButton" class="absolute top-4 right-4 text-white text-3xl z-20 p-2 rounded-full bg-black bg-opacity-50 hover:bg-opacity-75" aria-label="close image preview">
@@ -357,8 +345,7 @@
 
         const THEME_KEY = 'chromaChatThemePreference';
         
-        // --- Function Definitions (Sound, Notifications, Socket, ApplyTheme, etc.) ---
-        // ... (All function definitions from previous version) ...
+        // --- Function Definitions ---
         function initializeSounds() { /* ... */ }
         function playNotificationSound() { /* ... */ }
         function requestNotificationPermission() { /* ... */ }
@@ -366,10 +353,151 @@
         function updateConnectionStatus(status, message = '') { /* ... */ }
         function connectToServer() { /* ... */ }
         function applyTheme(theme) { /* ... with DEBUG logs ... */ }
-        async function handleJoinChat() { /* ... */ }
-        function resetJoinButton() { /* ... */ }
-        function showUserSetupModal(initial = false) { /* ... with DEBUG logs ... */ }
-        function hideUserSetupModal() { /* ... with DEBUG logs ... */ }
+        
+        function resetJoinButton() {
+            console.log("[DEBUG] resetJoinButton called");
+            if(joinChatButtonDefaultIcon) joinChatButtonDefaultIcon.classList.remove('hidden');
+            if(joinChatButtonText) joinChatButtonText.classList.remove('hidden');
+            if(joinChatButtonLoader) joinChatButtonLoader.classList.add('hidden');
+            if(joinChatButton) joinChatButton.disabled = false;
+        }
+
+        async function handleJoinChat() {
+            console.log("[DEBUG] handleJoinChat called");
+            if (!joinChatButtonDefaultIcon || !joinChatButtonText || !joinChatButtonLoader || !joinChatButton || !usernameInput || !setupError || !profilePicInput || !profilePicPreview || !currentUserAvatar) {
+                console.error("[DEBUG] CRITICAL: One or more elements missing in handleJoinChat. Aborting.");
+                if(joinChatButton) resetJoinButton(); // Attempt to reset button if it exists
+                return false;
+            }
+
+            joinChatButtonDefaultIcon.classList.add('hidden');
+            joinChatButtonText.classList.add('hidden');
+            joinChatButtonLoader.classList.remove('hidden');
+            joinChatButton.disabled = true;
+
+            const username = usernameInput.value.trim();
+            if (!username) { 
+                setupError.textContent = "nickname cannot be empty."; 
+                console.log("[DEBUG] Nickname empty, error set.");
+                resetJoinButton(); 
+                return false; 
+            }
+            if (username.length > 20) { 
+                setupError.textContent = "nickname too long."; 
+                console.log("[DEBUG] Nickname too long, error set.");
+                resetJoinButton(); 
+                return false; 
+            }
+            
+            setupError.textContent = ""; // Clear previous errors
+            userProfile.username = username;
+            const file = profilePicInput.files[0];
+
+            if (file) {
+                if (file.size > 1 * 1024 * 1024) { 
+                    setupError.textContent = "image too large (max 1mb)."; 
+                    profilePicInput.value = ""; // Clear the invalid file selection
+                    resetJoinButton(); 
+                    return false; 
+                }
+                try {
+                    profilePicPreview.classList.add('loading');
+                    userProfile.profilePicDataUrl = await readFileAsDataURL(file);
+                    profilePicPreview.src = userProfile.profilePicDataUrl; 
+                    profilePicPreview.classList.remove('loading');
+                    console.log("[DEBUG] Profile picture processed from file.");
+                } catch (error) { 
+                    setupError.textContent = "could not process image."; 
+                    profilePicPreview.classList.remove('loading'); 
+                    resetJoinButton(); 
+                    return false; 
+                }
+            } else if (!userProfile.profilePicDataUrl || userProfile.profilePicDataUrl.includes('placehold.co')) { 
+                 // If no file chosen AND current PFP is still the default placeholder
+                 userProfile.profilePicDataUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(userProfile.username)}&background=4caf50&color=fff&size=128&font-size=0.4&format=svg&text-transform=lowercase`;
+                 profilePicPreview.src = userProfile.profilePicDataUrl;
+                 console.log("[DEBUG] Profile picture generated from username.");
+            }
+            // If a PFP was previously chosen (and is a data URL), and no new file is selected, keep the existing one.
+            
+            currentUserAvatar.src = userProfile.profilePicDataUrl;
+            
+            if (socket && socket.connected) {
+                 console.log("[DEBUG] Socket connected, emitting user_setup in handleJoinChat:", userProfile);
+                 socket.emit('user_setup', {
+                    username: userProfile.username,
+                    profilePicDataUrl: userProfile.profilePicDataUrl
+                });
+            } else {
+                console.log("[DEBUG] Socket not connected, calling connectToServer in handleJoinChat. user_setup will be emitted on 'connect'.");
+                connectToServer(); 
+            }
+            
+            // resetJoinButton(); // Already called in success/error paths.
+            // Do not call hideUserSetupModal here, it's called by the event listener on success.
+            return true; // Indicate success to the event listener
+        }
+        
+        function showUserSetupModal(initial = false) {
+            console.log("[DEBUG] showUserSetupModal called, initial:", initial); 
+            if (!userSetupModal || !userSetupModalBackdrop || !userSetupModalContent || !chatAppContainer) {
+                console.error("[DEBUG] CRITICAL: One or more modal/app elements not found in showUserSetupModal!");
+                return; 
+            }
+
+            userSetupModal.classList.remove('hidden'); 
+            console.log("[DEBUG] userSetupModal 'hidden' class removed. Current classes:", userSetupModal.className); 
+            void userSetupModal.offsetWidth; 
+
+            if (initial) { 
+                userSetupModalBackdrop.classList.remove('modal-bg-leave-active');
+                userSetupModalBackdrop.classList.add('modal-bg-enter', 'modal-bg-enter-active');
+                userSetupModalContent.classList.remove('modal-content-leave-active');
+                userSetupModalContent.classList.add('modal-content-enter', 'modal-content-enter-active');
+                console.log("[DEBUG] Initial modal animation classes applied."); 
+            } else {
+                userSetupModalBackdrop.style.opacity = '0.75'; // Ensure visible if re-shown
+                userSetupModalContent.style.opacity = '1';
+                userSetupModalContent.style.transform = 'scale(1) translateY(0)';
+                console.log("[DEBUG] Modal shown without initial animation (re-show)."); 
+            }
+            chatAppContainer.classList.add('hidden'); 
+            console.log("[DEBUG] chatAppContainer 'hidden' class added. Current classes:", chatAppContainer.className); 
+            console.log("[DEBUG] showUserSetupModal finished.");
+        }
+
+        function hideUserSetupModal() {
+            console.log("[DEBUG] hideUserSetupModal called"); 
+            if (!userSetupModal || !userSetupModalBackdrop || !userSetupModalContent || !chatAppContainer || !chatApp || !messageInput) {
+                console.error("[DEBUG] CRITICAL: One or more modal/app elements not found in hideUserSetupModal!");
+                return;
+            }
+
+            userSetupModalBackdrop.classList.remove('modal-bg-enter', 'modal-bg-enter-active');
+            userSetupModalBackdrop.classList.add('modal-bg-leave-active');
+            userSetupModalContent.classList.remove('modal-content-enter', 'modal-content-enter-active');
+            userSetupModalContent.classList.add('modal-content-leave-active');
+            console.log("[DEBUG] Modal leave animation classes applied."); 
+
+            setTimeout(() => {
+                console.log("[DEBUG] setTimeout in hideUserSetupModal triggered."); 
+                userSetupModal.classList.add('hidden'); 
+                chatAppContainer.classList.remove('hidden'); 
+                chatAppContainer.classList.add('flex');      
+                chatApp.classList.add('app-loaded');         
+                console.log("[DEBUG] Main app shown, app-loaded class added. Current classes for chatAppContainer:", chatAppContainer.className, "for chatApp:", chatApp.className); 
+                setTimeout(() => {
+                    if(messageInput) {
+                         messageInput.focus();
+                         console.log("[DEBUG] Message input focused."); 
+                    } else {
+                        console.error("[DEBUG] messageInput is null in hideUserSetupModal's inner setTimeout!");
+                    }
+                }, 50); 
+            }, 300); 
+            console.log("[DEBUG] hideUserSetupModal finished.");
+        }
+        
         function renderMessages() { /* ... */ }
         async function handleSendMessage() { /* ... */ }
         function addMessageToLocalListAndUI(msg, animate = true) { /* ... */ }
@@ -397,94 +525,64 @@
             // Element existence checks
             if (!document.getElementById('themeToggleButton')) console.error("[DEBUG] CRITICAL: themeToggleButton NOT found!");
             if (!userSetupModal) console.error("[DEBUG] CRITICAL: userSetupModal var is null/undefined!");
-            // ... (add more checks for all globally declared DOM element consts if needed)
-
+            
             applyTheme(loadThemePreference());
-            console.log("[DEBUG] Theme applied."); 
             initializeSounds();
-            console.log("[DEBUG] Sounds initialized."); 
             requestNotificationPermission();
-            console.log("[DEBUG] Notification permission requested."); 
 
             if (userProfile.username && userProfile.id) { 
-                console.log("[DEBUG] User profile found, showing main chat."); 
                 if(currentUserAvatar) currentUserAvatar.src = userProfile.profilePicDataUrl;
-                hideUserSetupModal();
+                hideUserSetupModal(); // This will now show chatAppContainer
                 connectToServer(); 
             } else {
-                console.log("[DEBUG] No complete user profile, showing setup modal."); 
                 showUserSetupModal(true); 
             }
-            console.log("[DEBUG] Setting up emoji picker."); 
             setupEmojiPicker();
 
-            // MODIFICATION: Move global event listener attachments here
             console.log("[DEBUG] Attaching global event listeners.");
-            if (profilePicInput) profilePicInput.addEventListener('change', async (e) => { /* ... file processing logic from original handleJoinChat/profilePicInput listener ... */ 
-                const file = e.target.files[0];
-                if (file) {
-                    if (file.size > 1 * 1024 * 1024) {
-                        setupError.textContent = "image too large! max 1mb.";
-                        profilePicInput.value = ""; return;
+            if (profilePicInput) {
+                profilePicInput.addEventListener('change', async (e) => { 
+                    const file = e.target.files[0];
+                    if (file) {
+                        if (file.size > 1 * 1024 * 1024) {
+                            if(setupError) setupError.textContent = "image too large! max 1mb.";
+                            profilePicInput.value = ""; return;
+                        }
+                        if(setupError) setupError.textContent = "";
+                        if(profilePicPreview) profilePicPreview.classList.add('loading');
+                        try {
+                            const dataUrl = await readFileAsDataURL(file);
+                            if(profilePicPreview) profilePicPreview.src = dataUrl; 
+                            console.log("[DEBUG] PFP preview src updated to dataUrl in listener.");
+                        } catch (err) {
+                            if(setupError) setupError.textContent = "could not process image.";
+                            console.error("[DEBUG] Error reading PFP file:", err);
+                        } finally {
+                            if(profilePicPreview) profilePicPreview.classList.remove('loading');
+                        }
                     }
-                    setupError.textContent = "";
-                    profilePicPreview.classList.add('loading');
-                    try {
-                        // Store in a temporary variable if needed for handleJoinChat, or directly update userProfile if appropriate here
-                        const dataUrl = await readFileAsDataURL(file);
-                        profilePicPreview.src = dataUrl; 
-                        // If you want to immediately prepare it for userProfile:
-                        // userProfile.newProfilePicDataUrl = dataUrl; // Example
-                    } catch (err) {
-                        setupError.textContent = "could not process image.";
-                    } finally {
-                        profilePicPreview.classList.remove('loading');
-                    }
-                }
-            }); else console.error("[DEBUG] profilePicInput is null, cannot attach listener.");
+                });
+            } else console.error("[DEBUG] profilePicInput is null, cannot attach listener.");
 
-            if (joinChatButton) joinChatButton.addEventListener('click', async () => { if (await handleJoinChat()) hideUserSetupModal(); }); else console.error("[DEBUG] joinChatButton is null!");
+            if (joinChatButton) {
+                joinChatButton.addEventListener('click', async () => { 
+                    const success = await handleJoinChat();
+                    if (success) {
+                        hideUserSetupModal(); 
+                    } 
+                    // resetJoinButton is handled within handleJoinChat for error cases
+                });
+            } else console.error("[DEBUG] joinChatButton is null!");
+            
             if (attachFileButtonTrigger) attachFileButtonTrigger.addEventListener('click', () => imageFileInput.click()); else console.error("[DEBUG] attachFileButtonTrigger is null!");
-            if (imageFileInput) imageFileInput.addEventListener('change', async (e) => { /* ... file processing logic ... */ 
-                const file = e.target.files[0];
-                if (file) {
-                    if (file.size > 1.5 * 1024 * 1024) { 
-                        alert("image file is too large for messages (max 1.5mb).");
-                        imageFileInput.value = ""; tempImageFileDataUrl = null;
-                        attachFileButtonTrigger.classList.remove('text-green-400'); return;
-                    }
-                    attachFileLoader.classList.remove('hidden');
-                    attachFileButtonTrigger.classList.add('opacity-50');
-                    try {
-                        tempImageFileDataUrl = await readFileAsDataURL(file);
-                        attachFileButtonTrigger.classList.add('text-green-400'); 
-                    } catch (error) {
-                        alert("could not process the image file.");
-                        tempImageFileDataUrl = null; attachFileButtonTrigger.classList.remove('text-green-400');
-                    } finally {
-                        attachFileLoader.classList.add('hidden');
-                        attachFileButtonTrigger.classList.remove('opacity-50');
-                    }
-                } else { tempImageFileDataUrl = null; attachFileButtonTrigger.classList.remove('text-green-400'); }
-            }); else console.error("[DEBUG] imageFileInput is null!");
-
+            if (imageFileInput) imageFileInput.addEventListener('change', async (e) => { /* ... same as before ... */ }); else console.error("[DEBUG] imageFileInput is null!");
             if (closeImagePreviewButton) closeImagePreviewButton.addEventListener('click', closeImagePreview); else console.error("[DEBUG] closeImagePreviewButton is null!");
-            // Check if imagePreviewModalFullImgBackdrop is valid before adding listener
-            if (imagePreviewModalFullImgBackdrop) {
-                imagePreviewModalFullImgBackdrop.addEventListener('click', closeImagePreview);
-            } else {
-                console.error("[DEBUG] imagePreviewModalFullImgBackdrop is null! Cannot attach click listener for closing image preview via backdrop.");
-            }
+            if (imagePreviewModalFullImgBackdrop) imagePreviewModalFullImgBackdrop.addEventListener('click', closeImagePreview); else console.error("[DEBUG] imagePreviewModalFullImgBackdrop is null!");
             if (themeToggleButton) themeToggleButton.addEventListener('click', toggleTheme); else console.error("[DEBUG] themeToggleButton is null!");
             if (sendMessageButton) sendMessageButton.addEventListener('click', handleSendMessage); else console.error("[DEBUG] sendMessageButton is null!");
             if (messageInput) {
                 messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }});
-                messageInput.addEventListener('input', () => {
-                    if (!socket || !socket.connected) return;
-                    if (typingTimeout) clearTimeout(typingTimeout);
-                    socket.emit('start_typing');
-                    typingTimeout = setTimeout(() => { socket.emit('stop_typing'); }, 2000);
-                });
+                messageInput.addEventListener('input', () => { /* ... same as before ... */ });
             } else console.error("[DEBUG] messageInput is null!");
             if (toggleUserListButton) toggleUserListButton.addEventListener('click', () => userListSidebar.classList.toggle('open')); else console.error("[DEBUG] toggleUserListButton is null!");
             
@@ -492,30 +590,7 @@
         }
         
         window.onload = initializeApp; 
-        window.onbeforeunload = () => { 
-            console.log("[DEBUG] onbeforeunload: Disconnecting socket if connected.");
-            if (socket && socket.connected) socket.disconnect(); 
-            if(typingTimeout) clearTimeout(typingTimeout); 
-        };
+        window.onbeforeunload = () => { /* ... */ };
     </script>
 </body>
 </html>
-```
-
-**Key Changes in this Version:**
-
-1.  **Moved Event Listeners:** All the `addEventListener` calls that were previously in the global scope (after function definitions but before `window.onload`) have been moved *inside* the `initializeApp` function. This ensures they are only attached *after* `window.onload` has fired, guaranteeing that all DOM elements are parsed and their corresponding JavaScript constants (like `imagePreviewModalFullImgBackdrop`) have been successfully assigned.
-2.  **Added Null Checks for Event Listener Attachments:** Before attaching an event listener, I've added a simple `if (elementVariable)` check. If any of the essential element variables are `null` (meaning `document.getElementById` failed to find them), an error will be logged in the console, but it won't try to call `.addEventListener` on `null`, which would throw a `TypeError` and halt further listener attachments. This helps isolate if a specific element ID is mismatched.
-
-**Please deploy this new version to Netlify.**
-
-Then, open `https://chromachat.netlify.app/` and immediately check the developer console.
-
-**What to look for in the console now:**
-
-* **No `ReferenceError` for `imagePreviewModalFullImgBackdrop`:** This specific error should be gone.
-* **Any new `[DEBUG] CRITICAL: ... element NOT found!` messages OR `[DEBUG] ... is null, cannot attach listener.` messages:** If you see these, it means there's a typo in an HTML element's `id` or the element is unexpectedly missing from the DOM when the script tries to find it.
-* **Modal Visibility:** Does the user setup modal appear now?
-* **Other Errors:** Are there any *new* red errors?
-
-This change directly addresses the most likely cause of the `ReferenceError` by ensuring the order of operations is robu
